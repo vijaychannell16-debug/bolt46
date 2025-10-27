@@ -26,9 +26,7 @@ const THERAPY_MODULES = [
   { id: 'art', name: 'Art Therapy', category: 'creative', totalSessions: 30 },
   { id: 'exposure', name: 'Exposure Therapy', category: 'behavioral', totalSessions: 30 },
   { id: 'video', name: 'Video Therapy', category: 'educational', totalSessions: 30 },
-  { id: 'act', name: 'ACT', category: 'acceptance', totalSessions: 30 },
-  { id: 'mood', name: 'Mood Tracking', category: 'monitoring', totalSessions: 30 },
-  { id: 'sleep', name: 'Sleep Therapy', category: 'wellness', totalSessions: 30 }
+  { id: 'act', name: 'ACT', category: 'acceptance', totalSessions: 30 }
 ];
 
 export const initializePatientProgress = (userId: string): PatientTherapyProgress => {
@@ -53,9 +51,33 @@ export const initializePatientProgress = (userId: string): PatientTherapyProgres
 export const getPatientProgress = (userId: string): PatientTherapyProgress => {
   const saved = localStorage.getItem(`mindcare_therapy_progress_${userId}`);
   if (saved) {
-    return JSON.parse(saved);
+    const progress: PatientTherapyProgress = JSON.parse(saved);
+
+    // Sync with current therapy modules
+    const currentModuleIds = THERAPY_MODULES.map(m => m.id);
+
+    // Remove modules that no longer exist
+    progress.modules = progress.modules.filter(m => currentModuleIds.includes(m.id));
+
+    // Add new modules that don't exist in progress
+    THERAPY_MODULES.forEach(therapyModule => {
+      const existingModule = progress.modules.find(m => m.id === therapyModule.id);
+      if (!existingModule) {
+        progress.modules.push({
+          id: therapyModule.id,
+          name: therapyModule.name,
+          totalSessions: therapyModule.totalSessions,
+          completedSessions: 0,
+          category: therapyModule.category
+        });
+      }
+    });
+
+    // Save synced progress
+    savePatientProgress(progress);
+    return progress;
   }
-  
+
   // Initialize progress for new user
   const initialProgress = initializePatientProgress(userId);
   savePatientProgress(initialProgress);
@@ -65,49 +87,61 @@ export const getPatientProgress = (userId: string): PatientTherapyProgress => {
 export const updateTherapyCompletion = (userId: string, moduleId: string): PatientTherapyProgress => {
   const progress = getPatientProgress(userId);
   const today = new Date().toISOString().split('T')[0];
-  
+
+  // Check if session was already completed today for this module
+  const lastCompletionKey = `lastCompletion_${moduleId}`;
+  const lastCompletion = localStorage.getItem(lastCompletionKey);
+
+  if (lastCompletion === today) {
+    // Already completed this module today, don't increment again
+    return progress;
+  }
+
   // Find and update the specific module
   const moduleIndex = progress.modules.findIndex(m => m.id === moduleId);
   if (moduleIndex !== -1) {
     const module = progress.modules[moduleIndex];
-    
+
     // Increment completed sessions (max 30)
     if (module.completedSessions < module.totalSessions) {
       module.completedSessions += 1;
       module.lastCompletedDate = today;
-      
+
+      // Mark this module as completed today
+      localStorage.setItem(lastCompletionKey, today);
+
       // Update overall progress
       progress.totalCompletedSessions += 1;
       progress.overallProgress = Math.round(
-        (progress.modules.reduce((sum, m) => sum + m.completedSessions, 0) / 
+        (progress.modules.reduce((sum, m) => sum + m.completedSessions, 0) /
          progress.modules.reduce((sum, m) => sum + m.totalSessions, 0)) * 100
       );
-      
+
       // Update streak if this is a new day
       if (progress.lastUpdated.split('T')[0] !== today) {
         const lastDate = new Date(progress.lastUpdated.split('T')[0]);
         const todayDate = new Date(today);
         const daysDiff = Math.floor((todayDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
-        
+
         if (daysDiff === 1) {
           progress.streakDays += 1;
         } else if (daysDiff > 1) {
           progress.streakDays = 1;
         }
       }
-      
+
       progress.lastUpdated = new Date().toISOString();
-      
+
       // Save updated progress
       savePatientProgress(progress);
-      
+
       // Send progress to therapist analytics
       sendProgressToTherapist(progress);
-      
+
       return progress;
     }
   }
-  
+
   return progress;
 };
 
