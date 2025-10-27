@@ -68,7 +68,7 @@ function ProgressPage() {
 
   useEffect(() => {
     loadProgressData();
-    
+
     // Listen for storage changes to update data in real-time
     const handleStorageChange = () => {
       loadProgressData();
@@ -76,10 +76,12 @@ function ProgressPage() {
 
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('mindcare-data-updated', handleStorageChange);
+    window.addEventListener('mindcare-therapy-progress-updated', handleStorageChange);
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('mindcare-data-updated', handleStorageChange);
+      window.removeEventListener('mindcare-therapy-progress-updated', handleStorageChange);
     };
   }, [user, selectedTimeframe]);
 

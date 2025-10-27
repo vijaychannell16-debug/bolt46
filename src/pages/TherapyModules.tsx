@@ -10,6 +10,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { updateStreak } from '../utils/streakManager';
 import { getAllTherapies } from '../utils/therapyStorage';
+import { updateTherapyCompletion } from '../utils/therapyProgressManager';
 import { Therapy } from '../types/therapy';
 
 function TherapyModules() {
@@ -78,6 +79,11 @@ function TherapyModules() {
 
     // Update streak
     updateStreak();
+
+    // Update therapy progress tracking
+    if (user?.id) {
+      updateTherapyCompletion(user.id, moduleId);
+    }
 
     if (userProgress?.currentPlan) {
       const existingCompletedTherapies = userProgress.completedTherapies || [];
